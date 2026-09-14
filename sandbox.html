@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ManzKind Sandbox Diagnostics</title>
+<style>
+body{font:14px system-ui;margin:20px;background:#111;color:#ddd}
+button{padding:8px 12px;background:#252525;color:#eee;border:1px solid #555;border-radius:5px}
+pre{white-space:pre-wrap;font:12px ui-monospace,monospace}
+</style>
+</head>
+<body>
+<h3>Sandbox diagnostics</h3>
+<button id="run">Run 1/2/4/8-worker benchmark</button>
+<pre id="out">Ready.</pre>
+<script>
+const out=document.getElementById("out");
+async function work(workers) {
+  const t0=performance.now();
+  const jobs=[];
+  for(let w=0;w<workers;w++){
+    jobs.push(new Promise(resolve=>{
+      const blob=new Blob([`onmessage=e=>{let x=e.data;for(let i=0;i<10000000;i++)x=Math.sin(x)+Math.cos(x);postMessage(x)}`],{type:"text/javascript"});
+      const worker=new Worker(URL.createObjectURL(blob));
+      worker.onmessage=()=>{worker.terminate();resolve()};
+      worker.postMessage(w+1);
+    }));
+  }
+  await Promise.all(jobs);
+  return (performance.now()-t0)/1000;
+}
+document.getElementById("run").onclick=async()=>{
+  out.textContent="Running…";
+  const times={};
+  for(const n of [1,2,4,8]) times[n]=await work(n);
+  const base=times[1];
+  out.textContent=Object.entries(times).map(([n,t])=>{
+    const speed=base/t, eff=speed/Number(n)*100;
+    return `${n} worker(s): ${t.toFixed(3)} s | speed-up ${speed.toFixed(2)}x | efficiency ${eff.toFixed(0)}%`;
+  }).join("\\n");
+};
+</script>
+</body>
+</html>
